@@ -40,8 +40,7 @@
     (modify-syntax-entry ?\" "\"" table)
     (modify-syntax-entry ?\\ "\\" table)
 
-    ;; additional symbols
-    (modify-syntax-entry ?_ "w" table)
+    (modify-syntax-entry ?_ "_" table)
 
     (modify-syntax-entry ?' "." table)
     (modify-syntax-entry ?: "." table)
@@ -83,12 +82,12 @@
     "float32" "float64" "string"
     "bool"))
 
-(defun jai-wrap-word-rx (s)
-  (concat "\\<" s "\\>"))
+(defun jai-wrap-symbol-rx (s)
+  (concat "\\_<" s "\\_>"))
 
 (defun jai-keywords-rx (keywords)
   "build keyword regexp"
-  (jai-wrap-word-rx (regexp-opt keywords t)))
+  (jai-wrap-symbol-rx (regexp-opt keywords t)))
 
 (defconst jai-hat-type-rx (rx (group (and "^" (1+ word)))))
 (defconst jai-dollar-type-rx (rx (group "$" (or (1+ word) (opt "$")))))
@@ -114,16 +113,16 @@
     (,(jai-keywords-rx jai-constants) 1 font-lock-constant-face)
 
     ;; Hash directives
-    ("#\\w+" . font-lock-preprocessor-face)
+    ("#\\_<.+?\\_>" . font-lock-preprocessor-face)
 
     ;; At directives
-    ("@\\w+" . font-lock-preprocessor-face)
+    ("@\\_<.+?\\_>" . font-lock-preprocessor-face)
 
     ;; Strings
     ("\\\".*\\\"" . font-lock-string-face)
 
     ;; Numbers
-    (,(jai-wrap-word-rx jai-number-rx) . font-lock-constant-face)
+    (,(jai-wrap-symbol-rx jai-number-rx) . font-lock-constant-face)
 
     ;; Types
     (,(jai-keywords-rx jai-typenames) 1 font-lock-type-face)
