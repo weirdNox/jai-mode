@@ -212,7 +212,7 @@
   (setq-local require-final-newline mode-require-final-newline)
   (setq-local parse-sexp-ignore-comments t)
   (setq-local comment-start-skip "\\(//+\\|/\\*+\\)\\s *")
-  (setq-local comment-start "//")
+  (setq-local comment-start "// ")
   (setq-local block-comment-start "/*")
   (setq-local block-comment-end "*/")
   (setq-local indent-line-function 'js-indent-line)
