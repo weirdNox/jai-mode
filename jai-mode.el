@@ -31,9 +31,12 @@
 
 ;;; Code:
 
-(require 'rx)
+(require 'cc-mode)
+(require 'cc-langs)
 (require 'js)
-(require 'compile)
+
+(require 'newcomment)
+(require 'rx)
 
 (defconst jai-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -77,17 +80,10 @@
   '("null" "true" "false"))
 
 (defconst jai-typenames
-  '("int" "u64" "u32" "u16" "u8"
-    "s64" "s32" "s16" "s8" "float"
-    "float32" "float64" "string"
-    "bool"))
+  '("int" "u64" "u32" "u16" "u8" "s64" "s32" "s16" "s8" "float" "float32" "float64" "string" "bool"))
 
-(defun jai-wrap-symbol-rx (s)
-  (concat "\\_<" s "\\_>"))
-
-(defun jai-keywords-rx (keywords)
-  "build keyword regexp"
-  (jai-wrap-symbol-rx (regexp-opt keywords t)))
+(defsubst jai-wrap-symbol-rx (s) (concat "\\_<" s "\\_>"))
+(defsubst jai-keywords-rx (keywords) (jai-wrap-symbol-rx (regexp-opt keywords t)))
 
 (defconst jai-hat-type-rx (rx (group (and "^" (1+ word)))))
 (defconst jai-dollar-type-rx (rx (group "$" (or (1+ word) (opt "$")))))
@@ -131,15 +127,9 @@
 
     ("---" . font-lock-constant-face)))
 
-;; add setq-local for older emacs versions
-(unless (fboundp 'setq-local)
-  (defmacro setq-local (var val)
-    `(set (make-local-variable ',var) ,val)))
-
 (defconst jai--defun-rx "\(.*\).*\{")
 
-(defmacro jai-paren-level ()
-  `(car (syntax-ppss)))
+(defmacro jai-paren-level () `(car (syntax-ppss)))
 
 (defun jai-line-is-defun ()
   "return t if current line begins a procedure"
@@ -181,17 +171,6 @@
         (skip-chars-forward "^}")
         (forward-char)))))
 
-(defalias 'jai-parent-mode
-  (if (fboundp 'prog-mode) 'prog-mode 'fundamental-mode))
-
-;; imenu hookup
-(add-hook 'jai-mode-hook
-          (lambda ()
-            (setq imenu-generic-expression
-                  '(("type" "^\\(.*:*.*\\) : " 1)
-                    ("function" "^\\(.*\\) :: " 1)
-                    ("struct" "^\\(.*\\) *:: *\\(struct\\)\\(.*\\){" 1)))))
-
 ;; NOTE: taken from the scala-indent package and modified for Jai.
 ;;   Still uses the js-indent-line as a base, which will have to be
 ;;   replaced when the language is more mature.
@@ -200,28 +179,46 @@
              (= (save-excursion (back-to-indentation) (point)) (1- (point))))
     (js-indent-line)))
 
-(defun jai--add-self-insert-hooks ()
-  (add-hook 'post-self-insert-hook
-            'jai--indent-on-parentheses))
+(eval-and-compile (c-add-language 'jai-mode 'java-mode))
 
 ;;;###autoload
-(define-derived-mode jai-mode jai-parent-mode "Jai"
+(define-derived-mode jai-mode prog-mode "Jai"
   :syntax-table jai-mode-syntax-table
   :group 'jai
-  (setq bidi-paragraph-direction 'left-to-right)
-  (setq-local require-final-newline mode-require-final-newline)
-  (setq-local parse-sexp-ignore-comments t)
-  (setq-local comment-start-skip "\\(//+\\|/\\*+\\)\\s *")
-  (setq-local comment-start "// ")
-  (setq-local block-comment-start "/*")
-  (setq-local block-comment-end "*/")
-  (setq-local indent-line-function 'js-indent-line)
+  (c-initialize-cc-mode t)
+  (c-init-language-vars jai-mode)
+  (c-common-init 'jai-mode)
+
   (setq-local font-lock-defaults '(jai-font-lock-defaults))
   (setq-local beginning-of-defun-function 'jai-beginning-of-defun)
   (setq-local end-of-defun-function 'jai-end-of-defun)
 
-  ;; add indent functionality to some characters
-  (jai--add-self-insert-hooks)
+  (setq-local indent-line-function #'js-indent-line)
+
+  (setq-local open-paren-in-column-0-is-defun-start nil)
+  (setq-local parse-sexp-ignore-comments t)
+
+  (setq-local comment-start "// ")
+  (setq-local comment-start-skip "\\(?://+\\|/\\*+\\)\\s *")
+  (setq-local comment-end "")
+  (setq-local c-block-comment-prefix "* ")
+  (setq-local c-comment-prefix-regexp "//+\\|\\**")
+  (setq-local fill-paragraph-function #'js-fill-paragraph)
+  (setq-local normal-auto-fill-function #'js-do-auto-fill)
+  (setq-local comment-line-break-function #'c-indent-new-comment-line)
+  (setq-local comment-multi-line t)
+
+  (c-foreign-init-lit-pos-cache)
+  (add-hook 'before-change-functions #'c-foreign-truncate-lit-pos-cache nil t)
+  (c-setup-paragraph-variables)
+
+  (add-hook 'post-self-insert-hook 'jai--indent-on-parentheses)
+
+  (rx-let ((wsym (or word (syntax symbol))))
+    (setq-local
+     imenu-generic-expression
+     `(("cons or val" ,(rx bol (* space) (group-n 1 (+ wsym)) (* space) ":" (+? nonl) ":" (* space) (not "(")) 1)
+       ("function"    ,(rx bol (* space) (group-n 1 (+ wsym)) (* space) "::" (* space) "(") 1))))
 
   (font-lock-ensure))
 
